@@ -1,11 +1,12 @@
 import streamlit as st
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from proceso_transformer import crear_diagrama
 
 st.set_page_config(
     page_title="Traducción con Transformer Encoder-Decoder",
     page_icon="🌐",
-    layout="centered",
+    layout="wide",
 )
 
 MODELOS = {
@@ -36,7 +37,23 @@ def traducir(texto, tokenizer, model, max_new_tokens=256):
             num_beams=4,
             early_stopping=True,
         )
-    return tokenizer.batch_decode(salida_ids, skip_special_tokens=True)[0]
+    muestra_texto = " ".join(texto.split()[:2])
+    muestra_ids = tokenizer.encode(muestra_texto, add_special_tokens=False)
+    return {
+        "traduccion": tokenizer.batch_decode(salida_ids, skip_special_tokens=True)[0],
+        "entrada_ids": inputs["input_ids"][0].tolist(),
+        "entrada_tokens": tokenizer.convert_ids_to_tokens(inputs["input_ids"][0].tolist()),
+        "salida_ids": salida_ids[0].tolist(),
+        "salida_tokens": tokenizer.convert_ids_to_tokens(salida_ids[0].tolist()),
+        "capas_encoder": model.config.encoder_layers,
+        "capas_decoder": model.config.decoder_layers,
+        "cabezas": model.config.encoder_attention_heads,
+        "dimension": model.config.d_model,
+        "muestra_texto": muestra_texto,
+        "muestra_ids": muestra_ids,
+        "muestra_tokens": tokenizer.convert_ids_to_tokens(muestra_ids),
+        "especiales": tokenizer.all_special_ids,
+    }
 
 
 st.title("🌐 Traducción con un Transformer Encoder-Decoder")
@@ -71,6 +88,10 @@ texto = st.text_area(
 )
 
 traducir_btn = st.button("Traducir", type="primary", use_container_width=True)
+ver_proceso = st.checkbox("Ver Proceso", value=False)
+
+if st.session_state.get("origen_traduccion") != (texto, modelo_id):
+    st.session_state.pop("ultima_traduccion", None)
 
 if traducir_btn:
     if not texto.strip():
@@ -78,10 +99,17 @@ if traducir_btn:
     else:
         tokenizer, model = cargar_modelo(modelo_id)
         with st.spinner("Traduciendo..."):
-            resultado = traducir(texto, tokenizer, model)
+            st.session_state["ultima_traduccion"] = traducir(texto, tokenizer, model)
+            st.session_state["origen_traduccion"] = (texto, modelo_id)
 
-        st.subheader("Traducción")
-        st.success(resultado)
+if "ultima_traduccion" in st.session_state:
+    resultado = st.session_state["ultima_traduccion"]
+    st.subheader("Traducción")
+    st.success(resultado["traduccion"])
+    if ver_proceso:
+        st.iframe(crear_diagrama(texto, resultado), height="content")
+elif ver_proceso:
+    st.caption("Traduce un texto para recorrer su proceso paso a paso.")
 
 st.markdown("---")
 st.caption(
