@@ -2,6 +2,7 @@ import streamlit as st
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from proceso_transformer import crear_diagrama
+from atencion import extraer_atencion
 
 st.set_page_config(
     page_title="Traducción con Transformer Encoder-Decoder",
@@ -18,7 +19,7 @@ MODELOS = {
 @st.cache_resource(show_spinner="Descargando y cargando el modelo (solo la primera vez)...")
 def cargar_modelo(model_id: str):
     tokenizer = AutoTokenizer.from_pretrained(model_id)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_id, attn_implementation="eager")
     model.eval()
     return tokenizer, model
 
@@ -43,6 +44,7 @@ def traducir(texto, tokenizer, model, max_new_tokens=256):
         "traduccion": tokenizer.batch_decode(salida_ids, skip_special_tokens=True)[0],
         "entrada_ids": inputs["input_ids"][0].tolist(),
         "entrada_tokens": tokenizer.convert_ids_to_tokens(inputs["input_ids"][0].tolist()),
+        "entrada_mascara": inputs.get("attention_mask", torch.ones_like(inputs["input_ids"]))[0].tolist(),
         "salida_ids": salida_ids[0].tolist(),
         "salida_tokens": tokenizer.convert_ids_to_tokens(salida_ids[0].tolist()),
         "capas_encoder": model.config.encoder_layers,
@@ -107,6 +109,15 @@ if "ultima_traduccion" in st.session_state:
     st.subheader("Traducción")
     st.success(resultado["traduccion"])
     if ver_proceso:
+        if "atencion_cruzada" not in resultado and "error_atencion" not in resultado:
+            _, model = cargar_modelo(modelo_id)
+            with st.spinner("Calculando la atención de la traducción seleccionada..."):
+                try:
+                    resultado["atencion_cruzada"] = extraer_atencion(resultado, model)
+                except (RuntimeError, ValueError) as exc:
+                    resultado["error_atencion"] = str(exc)
+        if "error_atencion" in resultado:
+            st.warning("La traducción está disponible, pero no se pudo obtener su atención: " + resultado["error_atencion"])
         st.iframe(crear_diagrama(texto, resultado), height="content")
 elif ver_proceso:
     st.caption("Traduce un texto para recorrer su proceso paso a paso.")

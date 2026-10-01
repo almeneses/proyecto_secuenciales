@@ -79,6 +79,30 @@ details { border-top: 1px solid #34465f; padding-top: 12px; margin-top: 12px }
 summary { cursor: pointer; color: #a9c7ec; padding: 4px 0 12px }
 @media (max-width: 980px) { .workspace { grid-template-columns: 1fr } .map { position: static } .canvas { max-width: 620px; margin: auto } }
 @media (max-width: 450px) { main { padding: 12px } .detail { padding: 12px } h2 { font-size: 16px } nav .muted { display: none } .canvas > svg { min-width: 490px } #scene text { font-size: 22px } #scene .scene-small { font-size: 19px } #scene .scene-label { font-size: 18px } .scene-toolbar label { margin-left: 0 } }
+
+[hidden] { display: none !important }
+.attention-shortcut { margin-top: 16px; color: #6ee7ce }
+#cross-panel { margin-top: 20px; min-width: 0 }
+.cross-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 12px 0 }
+.cross-controls label { display: grid; gap: 5px; font-size: 12px; min-width: 0 }
+.cross-controls select { max-width: 100%; font-size: 13px }
+.cross-token-label { flex: 1; min-width: 130px !important }
+#cross-scroll { max-height: 520px; overflow: auto; border: 1px solid #34465f; border-radius: 10px; background: #101c2c }
+#cross-scroll:focus-visible { outline: 3px solid #6ee7ce }
+#cross-map { width: auto; max-width: none; font: 12px system-ui, sans-serif }
+#cross-map text { fill: #dce6f4 }
+#cross-map .heat-cell { cursor: pointer }
+#cross-map .heat-cell:hover { stroke: white; stroke-width: 2 }
+#cross-map .selected-row { fill: none; stroke: #fff; stroke-width: 2; pointer-events: none }
+.cross-legend { display: flex; align-items: center; gap: 10px; margin: 12px 0; font-size: 11px; color: #bacde0 }
+.cross-gradient { display: inline-block; width: 100px; height: 10px; border-radius: 4px; background: linear-gradient(90deg, rgb(19,32,51),rgb(110,231,206)) }
+#cross-hover { min-height: 36px; overflow-wrap: anywhere }
+#cross-tokens { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; max-height: 280px; overflow: auto }
+.source-token { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid #58728d; border-radius: 8px; font-size: 13px; overflow-wrap: anywhere; min-width: 0; max-width: 100% }
+.source-token small { font: 11px ui-monospace, monospace }
+.source-token.special { border-style: dashed }
+#cross-selected { overflow-wrap: anywhere }
+
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important } }
 </style>
 </head>
@@ -87,6 +111,7 @@ summary { cursor: pointer; color: #a9c7ec; padding: 4px 0 12px }
 <header><div><div class="eyebrow">DENTRO DEL TRANSFORMER</div><h2>De un idioma a otro</h2></div><span id="counter"></span></header>
 <p class="sample">Seguimos: <strong id="sample"></strong></p>
 <div class="track"><div id="progress"></div></div>
+<button id="goto-attention" class="attention-shortcut">Explorar cross-attention →</button>
 <div class="workspace"><div class="map"><div class="canvas">
 <svg viewBox="0 0 660 680" role="img" aria-label="Arquitectura encoder-decoder: entrada, tokens, embeddings, encoder, contexto, decoder, probabilidades, beam search y traducción">
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#81a3b5"/></marker></defs>
@@ -125,15 +150,42 @@ summary { cursor: pointer; color: #a9c7ec; padding: 4px 0 12px }
 </div>
 <section class="detail">
 <div aria-live="polite" aria-atomic="true"><h3 id="title"></h3><p id="description"></p><div id="representation"></div></div>
+<section id="cross-panel" hidden aria-label="Atención real del decoder sobre la entrada">
+<p id="cross-error" role="status" hidden></p>
+<div id="cross-content">
+<div class="cross-controls">
+<label>Capa <select id="cross-layer"></select></label>
+<label>Cabeza <select id="cross-head"><option value="mean">Promedio de cabezas</option></select></label>
+</div>
+<p class="muted">Filas: token que se predice · Columnas: tokens de entrada. Selecciona una celda o un token de salida.</p>
+<div id="cross-scroll" tabindex="0" aria-label="Mapa de calor desplazable">
+<svg id="cross-map" role="img" aria-label="Pesos de cross-attention por token"></svg>
+</div>
+<div class="cross-legend"><span class="cross-gradient"></span><span id="cross-scale"></span></div>
+<p id="cross-hover" class="muted" role="status">Pasa por una celda para ver su peso.</p>
+<div class="cross-controls">
+<button id="cross-prev" aria-label="Token de salida anterior">←</button>
+<label class="cross-token-label">Token de salida <select id="cross-token"></select></label>
+<button id="cross-next" aria-label="Token de salida siguiente">→</button>
+<button id="cross-play">Reproducir tokens</button>
+</div>
+<p id="cross-selected" aria-live="polite"></p>
+<div id="cross-tokens" aria-label="Entrada resaltada según la atención"></div>
+<p id="cross-summary" class="muted"></p>
+<p class="muted">Pesos reales recalculados sobre la traducción seleccionada, con máscara causal; no son el historial del beam search. Se incluyen tokens especiales. ▁ indica inicio de palabra. La atención no es una medida definitiva de importancia.</p>
+</div>
+</section>
+<div id="symbolic-panel">
 <div class="scene-toolbar" aria-label="Controles de animación">
 <button id="play" aria-label="Pausar animación">Pausar</button><button id="replay">↻ Repetir</button>
 <label for="speed">Velocidad</label><select id="speed"><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
 </div>
 <div class="scene-viewport"><svg id="scene" viewBox="0 0 620 570" role="img" aria-labelledby="scene-title scene-desc"></svg></div>
 <p id="scene-note" class="muted"></p><span id="motion-status" role="status"></span>
+</div>
 <details><summary>Ver fórmula y datos del paso</summary><div id="formula" class="formula"></div><div id="data" tabindex="0" aria-label="Transformación de la muestra"></div></details>
 </section></div>
-<p class="muted note">Texto, IDs y tokens reales. Vectores y operaciones simbólicos: e, x, h… nombran representaciones, no valores medidos. La muestra de dos palabras se tokeniza por separado para explicarla; el modelo traduce la entrada completa. El decoder no traduce palabra por palabra.</p>
+<p class="muted note">Texto, IDs, tokens y mapa de cross-attention reales. Los demás vectores y operaciones son simbólicos: e, x, h… nombran representaciones, no valores medidos. La muestra de dos palabras se tokeniza por separado para explicarla; el modelo traduce la entrada completa. El decoder no traduce palabra por palabra.</p>
 </main>
 <script>
 const d = __DATOS__;
@@ -403,6 +455,117 @@ get('replay').addEventListener('click', playScene);
 get('speed').addEventListener('change', () => animations.forEach(a => a.updatePlaybackRate(Number(get('speed').value))));
 reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) { animations.forEach(a => a.finish()); syncPlayback(); } });
 
+
+let crossWeights, crossMatrix, crossShape, crossRow = 0, crossTimer = null, crossMaximum = 1;
+const targetTokens = d.salida_tokens.slice(1);
+const cellSize = 38, mapLeft = 142, mapTop = 132;
+function crossColor(value) {
+  const t = Math.max(0, Math.min(1, value / crossMaximum));
+  return `rgb(${Math.round(19 + 91*t)},${Math.round(32 + 199*t)},${Math.round(51 + 155*t)})`;
+}
+function stopCross() {
+  clearInterval(crossTimer); crossTimer = null;
+  get('cross-play').textContent = 'Reproducir tokens';
+}
+function selectCrossRow(index, scroll = false) {
+  crossRow = Math.max(0, Math.min(crossShape[2]-1, index));
+  get('cross-token').value = crossRow;
+  get('cross-prev').disabled = crossRow === 0;
+  get('cross-next').disabled = crossRow === crossShape[2]-1;
+  get('cross-selected').textContent = `Al predecir «${targetTokens[crossRow]}» · posición ${crossRow+1}`;
+  const values = crossMatrix.subarray(crossRow*crossShape[3], (crossRow+1)*crossShape[3]);
+  get('cross-tokens').replaceChildren();
+  let strongest = 0;
+  d.entrada_tokens.forEach((token,i) => {
+    if (values[i] > values[strongest]) strongest = i;
+    const chip = document.createElement('span');
+    chip.className = 'source-token' + (d.especiales.includes(d.entrada_ids[i]) ? ' special' : '');
+    chip.style.background = crossColor(values[i]);
+    chip.style.color = values[i] / crossMaximum > .55 ? '#071820' : '#edf4ff';
+    const text = document.createElement('span'); text.textContent = token;
+    const weight = document.createElement('small'); weight.textContent = `${(values[i]*100).toFixed(2)} %`;
+    chip.append(text, weight); get('cross-tokens').append(chip);
+  });
+  get('cross-summary').textContent = `Mayor peso: «${d.entrada_tokens[strongest]}» (${(values[strongest]*100).toFixed(2)} %). Pesos sin renormalizar; la suma incluye tokens especiales.`;
+  get('cross-row-outline').setAttribute('y', mapTop + crossRow*cellSize);
+  if (scroll) {
+    const box = get('cross-scroll'), top = mapTop + crossRow*cellSize;
+    if (top < box.scrollTop || top + cellSize > box.scrollTop + box.clientHeight) box.scrollTop = Math.max(0, top - box.clientHeight / 2);
+  }
+}
+function renderCross() {
+  const attention = d.atencion_cruzada;
+  get('cross-error').hidden = Boolean(attention); get('cross-content').hidden = !attention;
+  if (!attention) {
+    get('cross-error').textContent = d.error_atencion || 'No se capturaron pesos para esta traducción. Vuelve a traducir para obtenerlos.';
+    return;
+  }
+  if (!crossWeights) {
+    crossShape = attention.forma;
+    const bytes = Uint8Array.from(atob(attention.pesos), c => c.charCodeAt(0));
+    const data = new DataView(bytes.buffer);
+    const count = crossShape.reduce((a,b) => a*b,1);
+    if (bytes.length !== count*4 || crossShape[2] !== targetTokens.length || crossShape[3] !== d.entrada_tokens.length) {
+      get('cross-error').hidden = false; get('cross-content').hidden = true;
+      get('cross-error').textContent = 'Los pesos no coinciden con los tokens de esta traducción.'; return;
+    }
+    crossWeights = new Float32Array(count);
+    for (let i=0;i<count;i++) crossWeights[i] = data.getFloat32(i*4,true);
+    for (let i=0;i<crossShape[0];i++) get('cross-layer').add(new Option(`Capa ${i+1}`,i));
+    get('cross-layer').value = crossShape[0]-1;
+    for (let i=0;i<crossShape[1];i++) get('cross-head').add(new Option(`Cabeza ${i+1}`,i));
+    targetTokens.forEach((token,i) => get('cross-token').add(new Option(`${i+1} · ${token}`,i)));
+  }
+  get('cross-hover').textContent = 'Pasa por una celda para ver su peso.';
+  const [layers,heads,rows,cols] = crossShape, size = rows*cols;
+  const layer = Number(get('cross-layer').value), head = get('cross-head').value;
+  crossMatrix = new Float32Array(size);
+  const selectedHeads = head === 'mean' ? Array.from({length:heads},(_,i)=>i) : [Number(head)];
+  selectedHeads.forEach(h => {
+    const offset = (layer*heads+h)*size;
+    for (let i=0;i<size;i++) crossMatrix[i] += crossWeights[offset+i] / selectedHeads.length;
+  });
+  crossMaximum = crossMatrix.reduce((max,v)=>Math.max(max,v),0) || 1;
+  get('cross-scale').textContent = `Color: 0 a ${crossMaximum.toFixed(4)} · ${head === 'mean' ? 'promedio de cabezas' : 'cabeza '+(Number(head)+1)}`;
+  const map = get('cross-map'); map.replaceChildren();
+  map.setAttribute('width',mapLeft+cols*cellSize+12); map.setAttribute('height',mapTop+rows*cellSize+12);
+  d.entrada_tokens.forEach((token,j) => {
+    const text = svgElement(map,'text',{x:mapLeft+j*cellSize+20,y:mapTop-12,transform:`rotate(-55 ${mapLeft+j*cellSize+20} ${mapTop-12})`},token.length>18 ? token.slice(0,17)+'…' : token);
+    svgElement(text,'title',{},token);
+  });
+  // ponytail: SVG para textos cortos; usar canvas si las matrices largas resultan lentas.
+  targetTokens.forEach((token,i) => {
+    const label = svgElement(map,'text',{x:mapLeft-9,y:mapTop+i*cellSize+24,'text-anchor':'end'},token.length>16 ? token.slice(0,15)+'…' : token);
+    svgElement(label,'title',{},token);
+    for (let j=0;j<cols;j++) svgElement(map,'rect',{x:mapLeft+j*cellSize,y:mapTop+i*cellSize,width:cellSize-1,height:cellSize-1,rx:3,fill:crossColor(crossMatrix[i*cols+j]),class:'heat-cell','data-row':i,'data-col':j});
+  });
+  svgElement(map,'rect',{id:'cross-row-outline',x:mapLeft,y:mapTop,width:cols*cellSize-1,height:cellSize-1,rx:3,class:'selected-row'});
+  selectCrossRow(crossRow);
+}
+get('goto-attention').addEventListener('click', () => { step = steps.findIndex(s=>s[4]==='cross'); render(); });
+['cross-layer','cross-head'].forEach(id => get(id).addEventListener('change', () => { stopCross(); renderCross(); }));
+get('cross-token').addEventListener('change', () => { stopCross(); selectCrossRow(Number(get('cross-token').value),true); });
+get('cross-prev').addEventListener('click', () => { stopCross(); selectCrossRow(crossRow-1,true); });
+get('cross-next').addEventListener('click', () => { stopCross(); selectCrossRow(crossRow+1,true); });
+get('cross-map').addEventListener('click', e => {
+  if (e.target.classList.contains('heat-cell')) { stopCross(); selectCrossRow(Number(e.target.dataset.row)); }
+});
+get('cross-map').addEventListener('pointermove', e => {
+  if (!e.target.classList.contains('heat-cell')) return;
+  const i = Number(e.target.dataset.row), j = Number(e.target.dataset.col);
+  get('cross-hover').textContent = `«${targetTokens[i]}» → «${d.entrada_tokens[j]}»: ${(crossMatrix[i*crossShape[3]+j]*100).toFixed(3)} %`;
+});
+get('cross-play').addEventListener('click', () => {
+  if (crossTimer) { stopCross(); return; }
+  if (crossRow === crossShape[2]-1) selectCrossRow(0,true);
+  get('cross-play').textContent = 'Pausar tokens';
+  crossTimer = setInterval(() => {
+    selectCrossRow(crossRow+1,true);
+    if (crossRow === crossShape[2]-1) stopCross();
+  },1000);
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopCross(); });
+
 function render() {
   const [title, description, formula, representation, kind] = steps[step];
   get('counter').textContent = `${step + 1} / ${steps.length}`;
@@ -437,7 +600,15 @@ function render() {
     const text = document.createElement('p'); text.textContent = d.traduccion.split(/\s+/).slice(0,2).join(' ');
     get('data').append(text); table(['Primeros tokens de salida', 'ID'], output.map(t=>[t.token,t.id]));
   }
+  stopCross();
+  const isCross = kind === 'cross';
+  get('cross-panel').hidden = !isCross; get('symbolic-panel').hidden = isCross;
+  if (isCross) {
+    renderCross();
+    get('representation').textContent = d.atencion_cruzada ? 'Cross-attention real · traducción seleccionada' : 'Atención real no disponible';
+  }
   renderScene(kind);
+  if (isCross) animations.forEach(a => a.finish());
   get('data').scrollTop = 0;
   document.querySelectorAll('[data-step]').forEach(el => {
     el.classList.toggle('active', Number(el.dataset.step) === step);
