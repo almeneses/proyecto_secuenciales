@@ -1,5 +1,14 @@
-streamlit>=1.64
-torch
-transformers
-sentencepiece
-sacremoses
+# Python >=3.12. Versiones del entorno utilizado en las pruebas.
+# Aplicación y visualización de atención
+streamlit==1.64.0
+torch==2.11.0
+transformers==5.17.0
+sentencepiece==0.2.2
+sacremoses==0.2.0
+numpy==2.5.2
+
+# Evaluación y gráficos del notebook
+sacrebleu==2.5.1
+pandas==3.0.5
+plotly==7.1.0
+ipython==9.16.1
