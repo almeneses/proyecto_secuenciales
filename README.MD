@@ -72,7 +72,7 @@ Lo particular de este modelo es que Q, K y V se calculan sobre vectores distinto
 | Self-attention del decoder | Q, K, V ← inglés ya generado | Coherencia con lo ya traducido (solo pasado, autoregresivo) |
 | Cross-attention | Q ← decoder · K, V ← encoder | Alinear cada palabra en inglés con la(s) palabra(s) en español relevantes |
 
-![](imagenes_informe/image1.png)
+![Arquitectura encoder-decoder y origen de Q, K y V](imagenes_informe/image1.png)
 
 Figura 1. Esquema propio de la arquitectura. La memoria del encoder aporta K y V a cada capa de cross-attention. El decoder aporta Q desde su estado actual.
 
@@ -155,7 +155,7 @@ A modo ilustrativo (deben reemplazarse o complementarse con capturas y resultado
 
 A continuación se muestra la aplicación de Streamlit en funcionamiento (reemplazar por capturas propias de las pruebas realizadas):
 
-![](imagenes_informe/image2.png)
+![Interfaz de traducción de la aplicación Streamlit](imagenes_informe/image2.png)
 
 ### 6.3 Métricas de desempeño reportadas
 
@@ -212,6 +212,18 @@ Los resultados por grupo permiten identificar diferencias según el tipo de fras
 El modelo distinguió sentidos de palabras como banco y vela según el contexto. Los modismos obtuvieron los puntajes más bajos. «Se me fue el santo al cielo» se tradujo literalmente como «The saint went to heaven», mientras que «You're kidding me» fue una alternativa válida para «Me estás tomando el pelo», aunque distinta de la referencia. También cambió `resultados_2026.csv` por `results_2026.csv` y suavizó una prohibición al usar *should not* en lugar de *must not*. Estos casos muestran que la fluidez no garantiza conservar el significado y los detalles.
 
 Las latencias corresponden a frases cortas, sin usuarios concurrentes. No se midieron el uso máximo de memoria ni el rendimiento bajo carga.
+
+#### Capturas propias de las pruebas
+
+Estas capturas del informe muestran una traducción correcta y el fallo observado en un modismo, obtenidos en la versión con cross-attention.
+
+![Traducción de El gato duerme sobre la silla en la aplicación](imagenes_informe/traduccion_gato.jpg)
+
+*La entrada «El gato duerme sobre la silla.» produjo «The cat sleeps on the chair.». La captura corresponde a la copia con cross-attention utilizada en las pruebas.*
+
+![Traducción literal del modismo Se me fue el santo al cielo](imagenes_informe/traduccion_modismo.jpg)
+
+*«Se me fue el santo al cielo» produjo «The saint went to heaven.». La salida es fluida, pero pierde el significado del modismo.*
 
 #### Atención y verificación de Q, K y V
 
