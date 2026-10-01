@@ -65,6 +65,7 @@ st.caption(
     "[paper](https://huggingface.co/papers/2212.01936) · "
     "[código oficial](https://github.com/Helsinki-NLP/OPUS-MT-train)"
 )
+st.caption("Integrantes: Marko David García - Alejandro Meneses - Henry Rosenstiehl")
 
 with st.sidebar:
     st.header("Configuración")
